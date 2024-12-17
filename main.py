@@ -119,7 +119,7 @@ def get_clan_info(clan_tag: str, start_date: datetime):
 
 app = FastAPI()
 
-@app.get("/api/results")
+@app.get("/cr/api/results")
 def get_results(weeks: int = Query(1, description="Number of past war weeks")):
     # Calculate the start date X weeks ago
     start_date = (datetime.now() - timedelta(weeks=weeks)).date()
