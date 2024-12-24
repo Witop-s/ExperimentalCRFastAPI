@@ -11,7 +11,7 @@ load_dotenv()
 RESULTS_BASE_URL = os.getenv("RESULTS_BASE_URL")
 
 @bot.command(description="Bilan cumulatif des x dernières semaines")
-async def bilan(ctx, weeks: int):
+async def bilan(ctx, weeks: int, limit: int):
     url = f"{RESULTS_BASE_URL}?weeks={weeks}"
 
     try:
@@ -20,7 +20,7 @@ async def bilan(ctx, weeks: int):
             data = response.json()["results"]
 
             message = ""
-            for i in range(len(data)):
+            for i in range(min(len(data), limit)):
                 message += f"{i+1} - {data[i]}\n"
             await ctx.respond(message)
 
