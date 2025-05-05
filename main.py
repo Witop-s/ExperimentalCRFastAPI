@@ -2,10 +2,8 @@ from fastapi import FastAPI
 
 import logging
 import requests
-import json
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Query
-from typing import List, Dict, Any
 import os
 from dotenv import load_dotenv
 
