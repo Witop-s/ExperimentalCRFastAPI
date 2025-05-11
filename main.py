@@ -131,7 +131,7 @@ app = FastAPI()
 def get_results(
     weeks: int = Query(1, description="Number of past war weeks"),
     skip_weeks: int = Query(0, description="Number of past war weeks to skip (starting from today)"),
-    ranking: bool = Query(False, description="Whether to display rank changes")
+    ranking: bool = Query(True, description="Whether to display rank changes")
 ):
     # Main period range
     end_datetime = datetime.now() - timedelta(weeks=skip_weeks)
