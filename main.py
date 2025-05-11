@@ -1,5 +1,3 @@
-from fastapi import FastAPI
-
 import logging
 import requests
 from datetime import datetime, timedelta
@@ -18,7 +16,8 @@ CLAN_TAG = os.getenv("CLAN_TAG")
 
 BASE_URL = "https://proxy.royaleapi.dev/v1"
 
-def get_clan_info(clan_tag: str, start_date: datetime):
+
+def get_clan_info(clan_tag: str, start_date: datetime, end_date: datetime = None):
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Accept": "application/json"
@@ -75,7 +74,11 @@ def get_clan_info(clan_tag: str, start_date: datetime):
     # Process river races
     for race in reversed(riverrace_data["items"]):  # from oldest to newest
         race_end_time = datetime.strptime(race["createdDate"], "%Y%m%dT%H%M%S.%fZ")
+
+        # Skip if before start_date or after end_date (if provided)
         if race_end_time < start_date:
+            continue
+        if end_date and race_end_time > end_date:
             continue
 
         for standing in race["standings"]:
@@ -115,15 +118,27 @@ def get_clan_info(clan_tag: str, start_date: datetime):
 
     return player_info
 
+
 app = FastAPI()
 
+
 @app.get("/cr/api/results")
-def get_results(weeks: int = Query(1, description="Number of past war weeks")):
-    # Calculate the start date X weeks ago
-    start_date = (datetime.now() - timedelta(weeks=weeks)).date()
+def get_results(
+        weeks: int = Query(1, description="Number of past war weeks"),
+        skip_weeks: int = Query(0, description="Number of recent weeks to skip")
+):
+    now = datetime.now()
+
+    # Calculate the end date (now minus the number of weeks to skip)
+    end_date = None
+    if skip_weeks > 0:
+        end_date = now - timedelta(weeks=skip_weeks)
+
+    # Calculate the start date (end_date minus the number of weeks to include)
+    start_date = (now - timedelta(weeks=(weeks + skip_weeks))).date()
     start_datetime = datetime.combine(start_date, datetime.min.time())
 
-    clan_info = get_clan_info(CLAN_TAG, start_datetime)
+    clan_info = get_clan_info(CLAN_TAG, start_datetime, end_date)
 
     # Sort by total_points descending
     # Convert dict to list for easier sorting
@@ -151,4 +166,12 @@ def get_results(weeks: int = Query(1, description="Number of past war weeks")):
         line += f" / {pts}"
         results.append(line)
 
-    return {"results": results}
+    # Add time range information to results
+    time_range = f"From {start_date.strftime('%Y-%m-%d')}"
+    if end_date:
+        time_range += f" to {end_date.date().strftime('%Y-%m-%d')}"
+
+    return {
+        "results": results,
+        "time_range": time_range
+    }
