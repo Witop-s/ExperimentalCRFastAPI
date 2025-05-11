@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Query
 import os
 from dotenv import load_dotenv
+from collections import defaultdict
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -16,7 +17,7 @@ CLAN_TAG = os.getenv("CLAN_TAG")
 
 BASE_URL = "https://proxy.royaleapi.dev/v1"
 
-def get_clan_info(clan_tag: str, start_date: datetime):
+def get_clan_info(clan_tag: str, start_date: datetime, end_date: datetime):
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Accept": "application/json"
@@ -73,7 +74,7 @@ def get_clan_info(clan_tag: str, start_date: datetime):
     # Process river races
     for race in reversed(riverrace_data["items"]):  # from oldest to newest
         race_end_time = datetime.strptime(race["createdDate"], "%Y%m%dT%H%M%S.%fZ")
-        if race_end_time < start_date:
+        if race_end_time < start_date or race_end_time >= end_date:
             continue
 
         for standing in race["standings"]:
@@ -111,17 +112,37 @@ def get_clan_info(clan_tag: str, start_date: datetime):
             player["avg_points_per_week"] = 0
             player["avg_attacks_per_week"] = 0
 
+    # Detect duplicate names
+    name_to_tags = defaultdict(list)
+    for tag, info in player_info.items():
+        name_to_tags[info["name"]].append(tag)
+
+    # Update names of duplicates to include first chars of tag
+    for name, tags in name_to_tags.items():
+        if len(tags) > 1:
+            for tag in tags:
+                player_info[tag]["name"] += f" ({tag[0:3]})"
+
     return player_info
 
 app = FastAPI()
 
 @app.get("/cr/api/results")
-def get_results(weeks: int = Query(1, description="Number of past war weeks")):
-    # Calculate the start date X weeks ago
-    start_date = (datetime.now() - timedelta(weeks=weeks)).date()
-    start_datetime = datetime.combine(start_date, datetime.min.time())
+def get_results(weeks: int = Query(1, description="Number of past war weeks"), skip_weeks: int = Query(0, description="Number of past war weeks to skip (starting from today)")):
+    # Compute the date range
+    end_datetime = datetime.now() - timedelta(weeks=skip_weeks)
+    start_datetime = end_datetime - timedelta(weeks=weeks)
 
-    clan_info = get_clan_info(CLAN_TAG, start_datetime)
+    # Truncate to start of day for consistency (optional)
+    start_datetime = datetime.combine(start_datetime.date(), datetime.min.time())
+    end_datetime = datetime.combine(end_datetime.date(), datetime.min.time())
+
+    # Debug prints
+    print(f"Start datetime: {start_datetime.isoformat()}")
+    print(f"End datetime  : {end_datetime.isoformat()}")
+
+    # Use in your function
+    clan_info = get_clan_info(CLAN_TAG, start_datetime, end_datetime)
 
     # Sort by total_points descending
     # Convert dict to list for easier sorting
