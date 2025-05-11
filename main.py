@@ -74,7 +74,7 @@ def get_clan_info(clan_tag: str, start_date: datetime, end_date: datetime):
     # Process river races
     for race in reversed(riverrace_data["items"]):  # from oldest to newest
         race_end_time = datetime.strptime(race["createdDate"], "%Y%m%dT%H%M%S.%fZ")
-        if race_end_time < start_date or race_end_time >= end_date:
+        if race_end_time < start_date or race_end_time > end_date:
             continue
 
         for standing in race["standings"]:
@@ -128,46 +128,95 @@ def get_clan_info(clan_tag: str, start_date: datetime, end_date: datetime):
 app = FastAPI()
 
 @app.get("/cr/api/results")
-def get_results(weeks: int = Query(1, description="Number of past war weeks"), skip_weeks: int = Query(0, description="Number of past war weeks to skip (starting from today)")):
-    # Compute the date range
+def get_results(
+    weeks: int = Query(1, description="Number of past war weeks"),
+    skip_weeks: int = Query(0, description="Number of past war weeks to skip (starting from today)"),
+    ranking: bool = Query(False, description="Whether to display rank changes")
+):
+    # Main period range
     end_datetime = datetime.now() - timedelta(weeks=skip_weeks)
     start_datetime = end_datetime - timedelta(weeks=weeks)
-
-    # Truncate to start of day for consistency (optional)
     start_datetime = datetime.combine(start_datetime.date(), datetime.min.time())
     end_datetime = datetime.combine(end_datetime.date(), datetime.min.time())
 
-    # Debug prints
-    print(f"Start datetime: {start_datetime.isoformat()}")
-    print(f"End datetime  : {end_datetime.isoformat()}")
-
-    # Use in your function
+    print(f"Main range: {start_datetime.isoformat()} to {end_datetime.isoformat()}")
     clan_info = get_clan_info(CLAN_TAG, start_datetime, end_datetime)
 
-    # Sort by total_points descending
-    # Convert dict to list for easier sorting
-    players_list = list(clan_info.items())
-    players_list.sort(key=lambda x: x[1]["total_points"], reverse=True)
+    # Rank comparison setup
+    previous_ranks = {}
+    current_ranks = {}
+    if ranking:
+        compare_end = datetime.now() - timedelta(weeks=skip_weeks+1)
+        compare_start = compare_end - timedelta(weeks=(weeks if weeks == 1 else weeks - 1))
+        compare_start = datetime.combine(compare_start.date(), datetime.min.time())
+        compare_end = datetime.combine(compare_end.date(), datetime.min.time())
 
-    # Group by total_points
-    results = []
+        print(f"Comparison range: {compare_start.isoformat()} to {compare_end.isoformat()}")
+        previous_info = get_clan_info(CLAN_TAG, compare_start, compare_end)
+
+        previous_ranks = compute_ranks(previous_info)
+
+    # Compute current ranks
+    current_ranks = compute_ranks(clan_info)
+
+    # Prepare list sorted by total_points descending
+    players_list = sorted(clan_info.items(), key=lambda x: x[1]["total_points"], reverse=True)
+
     grouped = {}
     for tag, info in players_list:
+        name = info["name"]
         pts = info["total_points"]
+
         if pts not in grouped:
             grouped[pts] = []
-        grouped[pts].append(info["name"])
 
-    # Create the final structure:
-    # Each entry: {"line": "member1 & member2 / total_points"}
+        arrow = ""
+        if ranking:
+            new_rank = current_ranks.get(name)
+            old_rank = previous_ranks.get(name)
+
+            print(f"Member: {name}, Points: {pts}, Rank: {new_rank}, Old Rank: {old_rank}")
+
+            if old_rank is not None:
+                if new_rank < old_rank:
+                    arrow = f" ▲{old_rank - new_rank}"
+                elif new_rank > old_rank:
+                    arrow = f" ▼{new_rank - old_rank}"
+                else:
+                    arrow = " ▬"
+
+        grouped[pts].append(name + arrow)
+
+    # Format result lines
+    results = []
     for pts, members in sorted(grouped.items(), key=lambda x: x[0], reverse=True):
         line = ", ".join(members)
-        # Replace the last occurrence of ", " by " & "
         if len(members) > 1:
-            # Calculate the character to replace
             to_replace = sum(len(member) for member in members[:-1]) + 2 * (len(members) - 1) - 2
             line = line[:to_replace] + " &" + line[to_replace + 1:]
         line += f" / {pts}"
         results.append(line)
 
     return {"results": results}
+
+def compute_ranks(clan_data: dict) -> dict[str, int]:
+    sorted_players = sorted(clan_data.items(), key=lambda x: x[1]["total_points"], reverse=True)
+
+    ranks = {}
+    current_rank = 1
+    prev_points = None
+
+    for tag, info in sorted_players:
+        pts = info["total_points"]
+        name = info["name"]
+
+        if pts != prev_points:
+            rank_to_assign = current_rank
+            current_rank += 1
+
+        # Else: same rank as before
+        ranks[name] = rank_to_assign
+
+        prev_points = pts
+
+    return ranks
