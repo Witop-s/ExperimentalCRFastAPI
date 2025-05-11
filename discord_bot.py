@@ -11,9 +11,9 @@ load_dotenv()
 RESULTS_BASE_URL = os.getenv("RESULTS_BASE_URL")
 
 @bot.command(description="Bilan cumulatif des x dernières semaines")
-async def bilan(ctx, weeks: int, skip_weeks: int = 0, limit: int = 10):
+async def bilan(ctx, weeks: int, skip_weeks: int = 0, limit: int = 10, ranking: bool = True):
     characters_limit = 70 # Clash Royale limit
-    url = f"{RESULTS_BASE_URL}?weeks={weeks}&skip_weeks={skip_weeks}"
+    url = f"{RESULTS_BASE_URL}?weeks={weeks}&skip_weeks={skip_weeks}&ranking={ranking}"
 
     try:
         response = requests.get(url)
