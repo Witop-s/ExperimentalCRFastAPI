@@ -179,9 +179,9 @@ def get_results(
 
             if old_rank is not None:
                 if new_rank < old_rank:
-                    arrow = f" ▲{old_rank - new_rank}"
+                    arrow = f" 🔺{old_rank - new_rank}"
                 elif new_rank > old_rank:
-                    arrow = f" ▼{new_rank - old_rank}"
+                    arrow = f" 🔻{new_rank - old_rank}"
                 else:
                     arrow = " ▬"
 
