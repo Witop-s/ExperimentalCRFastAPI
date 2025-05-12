@@ -74,7 +74,9 @@ def get_clan_info(clan_tag: str, start_date: datetime, end_date: datetime):
     # Process river races
     for race in reversed(riverrace_data["items"]):  # from oldest to newest
         race_end_time = datetime.strptime(race["createdDate"], "%Y%m%dT%H%M%S.%fZ")
-        if race_end_time < start_date or race_end_time > end_date:
+        print(f"Processing week {race_end_time.isoformat()}")
+        if race_end_time <= start_date or race_end_time >= end_date:
+            print(f"Skipping week")
             continue
 
         for standing in race["standings"]:
@@ -137,7 +139,9 @@ def get_results(
     end_datetime = datetime.now() - timedelta(weeks=skip_weeks)
     start_datetime = end_datetime - timedelta(weeks=weeks)
     start_datetime = datetime.combine(start_datetime.date(), datetime.min.time())
+    start_datetime += timedelta(days=1)
     end_datetime = datetime.combine(end_datetime.date(), datetime.min.time())
+    end_datetime += timedelta(days=1)
 
     print(f"Main range: {start_datetime.isoformat()} to {end_datetime.isoformat()}")
     clan_info = get_clan_info(CLAN_TAG, start_datetime, end_datetime)
