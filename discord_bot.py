@@ -26,7 +26,7 @@ async def bilan(ctx, weeks: int, skip_weeks: int = 0, limit: int = 10, ranking: 
 
                 for i, line in enumerate(data, start=1):
                     next_line = f"{i} - {line}\n"
-                    if len(current_message) + len(next_line) > characters_limit:
+                    if len(current_message) + current_message.count('\n') + len(next_line) + 1 > characters_limit:
                         messages.append(current_message)
                         current_message = next_line
                     else:
